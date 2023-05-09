@@ -11,7 +11,7 @@ build:
     - docker
   before_script:
     - echo "Setting up packages for Build"
-    - sudo apt-get update && sudo apt-get install jq rsync -y
+    - apt-get update && apt-get install jq rsync -y
   script:
     - npm i
     - npm run package
