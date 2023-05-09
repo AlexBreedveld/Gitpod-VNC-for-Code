@@ -38,12 +38,13 @@ create:release:
       artifacts: true
   variables:
     TAG: '$VERSIONVNC'
+    COMMITSHA: '$CI_COMMIT_SHA'
   script:
     - echo "Create Release $TAG"
   release:
     name: 'Gitpod VNC for Code Release $TAG'
     tag_name: '$TAG'
-    ref: '$TAG'
+    ref: '$COMMITSHA'
     description: 'Release $TAG'
     assets:
       links:
