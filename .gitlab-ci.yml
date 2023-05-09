@@ -36,6 +36,7 @@ create:release:
   stage: publish
   tags:
     - docker
+    - x86-64
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   needs:
     - job: build
