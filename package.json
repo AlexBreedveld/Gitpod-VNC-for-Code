@@ -2,7 +2,7 @@
   "name": "gitpod-vnc",
   "displayName": "Gitpod VNC",
   "description": "Open the desktop environment running on your Gitpod workspace.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "al3xdev",
   "author": {
     "name": "Alex Breedveld"
