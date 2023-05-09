@@ -33,6 +33,8 @@ create:release:
   tags:
     - docker
   image: registry.gitlab.com/gitlab-org/release-cli:latest
+  only:
+    - master
   needs:
     - job: build
       artifacts: true
@@ -49,4 +51,4 @@ create:release:
     assets:
       links:
         - name: "Gitpod VNC for Code"
-          url: "https://git.al3xdev.com/al3xdev/gitpod-vnc-shortcut/-/jobs/$JOB_ID/artifacts/download"
+          url: "https://git.al3xdev.com/al3xdev/gitpod-vnc-shortcut/-/jobs/$JOB_ID/artifacts/raw/gitpod-vnc.vsix"
