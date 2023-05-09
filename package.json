@@ -2,7 +2,7 @@
   "name": "gitpod-vnc",
   "displayName": "Gitpod VNC",
   "description": "Open the desktop environment running on your Gitpod workspace.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "al3xdev",
   "author": {
     "name": "Alex Breedveld"
@@ -52,7 +52,7 @@
           "GitpodVNC.openVNC": {
             "title": "Open VNC Desktop",
             "type": "boolean",
-            "default": true,
+            "default": false,
             "description": "Show 'Open VNC Desktop' Button on taskbar."
           },
           "GitpodVNC.vncPort": {
@@ -156,7 +156,7 @@
     "eslint": "^8.12.0",
     "glob": "^7.2.0",
     "typescript": "^4.6.3",
-    "vsce": "^2.7.0"
+    "@vscode/vsce": "^2.7.0"
   },
   "dependencies": {
     "sleep-promise": "^9.1.0"
