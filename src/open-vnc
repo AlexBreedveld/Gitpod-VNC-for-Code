@@ -1,0 +1,13 @@
+#!/bin/bash
+if [ $(gp ports list | grep $1 | cut -d "|" -f 3 | grep "open" -c) == 1 ];then
+    export GITPOD_URL_PROTOLESS=$(echo $GITPOD_WORKSPACE_URL | cut -d "/" -f 3)
+    export VNC_URL="https://"$1"-"$GITPOD_URL_PROTOLESS"/vnc.html?autoconnect=true&reconnect=true&resize=remote"
+    if [ $2 == 0 ];then
+        gp preview $VNC_URL
+    fi
+    if [ $2 == 1 ];then
+        sensible-browser $VNC_URL
+    fi
+else
+    echo "The VNC server is not running on port $1 or the Docker image wasn't initialized."
+fi

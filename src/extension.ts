@@ -1,193 +1,153 @@
-/*
-   Copyright (C) 2018-2021 Gourav Goyal and contributors.
-
-   This file is part of the Shortcut Menu Bar extension.
-
-   The Shortcut Menu Bar extension is free software: you can redistribute it
-   and/or modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation, either version 3 of the
-   License, or (at your option) any later version.
-
-   The Shortcut Menu Bar extension is distributed in the hope that it will
-   be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU Lesser General Public License for more details.
-
-   You should have received a copy of the GNU Lesser General Public License along
-   with the Shortcut Menu Bar extension. If not,see <https://www.gnu.org/licenses/>.
-*/
-
 "use strict";
 
+import { exec, spawn } from "child_process";
+const homedir = require('os').homedir();
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 // let fs = require("fs");
 import { basename, dirname, extname } from "path";
+import { fstat, readFileSync, stat, writeFileSync } from 'fs';
+const sleep = require('sleep-promise');
 import {
   commands,
   Disposable,
   env,
   ExtensionContext,
   extensions,
+  ProgressLocation,
   Uri,
   window,
   workspace,
+  TextDocument
 } from "vscode";
 
-var init = false;
-var hasCpp = false;
+const openvncscript = "#!/bin/bash\nif [ $(gp ports list | grep $1 | cut -d \"|\" -f 3 | grep \"open\" -c) == 1 ];then\n\texport GITPOD_URL_PROTOLESS=$(echo $GITPOD_WORKSPACE_URL | cut -d \"/\" -f 3)\n\texport VNC_URL=\"https://\"$1\"-\"$GITPOD_URL_PROTOLESS\"/vnc.html?autoconnect=true&reconnect=true&resize=remote\"\n\tif [ $2 == 0 ];then\n\t\tgp preview $VNC_URL\n\tfi\n\tif [ $2 == 1 ];then\n\t\tsensible-browser $VNC_URL\n\tfi\nelse\n\techo \"The VNC server is not running on port $1 or the Docker container wasn't initialized.\"\nfi";
 
-const extensionId = "jerrygoyal.shortcut-menu-bar";
+var init = false;
+
+const extensionId = "al3xdev.gitpod-vnc";
+
+/*
+export class Container {
+  private static _extContext: ExtensionContext;
+  
+  public static get context(): ExtensionContext {
+    return this._extContext;
+  }
+
+  public static set context(ec: ExtensionContext) {
+    this._extContext = ec;
+  }
+}
+*/
+
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(context: ExtensionContext) {
   if (!init) {
     init = true;
-
-    commands.getCommands().then(function (value) {
-      let result = value.indexOf("C_Cpp.SwitchHeaderSource");
-      if (result >= 0) {
-        hasCpp = true;
-      }
-    });
   }
+  
+  //Container.context = context;
 
-  console.log("extension is now active!");
+  writeFileSync(`${homedir}/.local/bin/open-vnc`, openvncscript);
 
-  // show notification on major release
-  showWhatsNew(context);
+  exec(`chmod +x ${homedir}/.local/bin/open-vnc`);
+  exec(`mkdir -p ${homedir}/.config/gitpod-vnc/`);
 
   // rest of code
   // Step: If simple commands then add to this array
-  let commandArray = [
-    //=> ["name in package.json" , "name of command to execute"]
-
-    ["ShortcutMenuBar.save", "workbench.action.files.save"],
-    [
-      "ShortcutMenuBar.toggleTerminal",
-      "workbench.action.terminal.toggleTerminal",
-    ],
-    [
-      "ShortcutMenuBar.toggleActivityBar",
-      "workbench.action.toggleActivityBarVisibility",
-    ],
-    ["ShortcutMenuBar.navigateBack", "workbench.action.navigateBack"],
-    ["ShortcutMenuBar.navigateForward", "workbench.action.navigateForward"],
-    [
-      "ShortcutMenuBar.toggleRenderWhitespace",
-      "editor.action.toggleRenderWhitespace",
-    ],
-    ["ShortcutMenuBar.quickOpen", "workbench.action.quickOpen"],
-    ["ShortcutMenuBar.findReplace", "editor.action.startFindReplaceAction"],
-    ["ShortcutMenuBar.undo", "undo"],
-    ["ShortcutMenuBar.redo", "redo"],
-    ["ShortcutMenuBar.commentLine", "editor.action.commentLine"],
-    ["ShortcutMenuBar.saveAll", "workbench.action.files.saveAll"],
-    ["ShortcutMenuBar.openFile", "workbench.action.files.openFile"],
-    ["ShortcutMenuBar.newFile", "workbench.action.files.newUntitledFile"],
-    ["ShortcutMenuBar.goToDefinition", "editor.action.revealDefinition"],
-    ["ShortcutMenuBar.cut", "editor.action.clipboardCutAction"],
-    ["ShortcutMenuBar.copy", "editor.action.clipboardCopyAction"],
-    ["ShortcutMenuBar.paste", "editor.action.clipboardPasteAction"],
-    [
-      "ShortcutMenuBar.compareWithSaved",
-      "workbench.files.action.compareWithSaved",
-    ],
-    ["ShortcutMenuBar.showCommands", "workbench.action.showCommands"],
-    ["ShortcutMenuBar.startDebugging", "workbench.action.debug.start"],
-
-    ["ShortcutMenuBar.indentLines", "editor.action.indentLines"],
-    ["ShortcutMenuBar.outdentLines", "editor.action.outdentLines"],
-    ["ShortcutMenuBar.openSettings", "workbench.action.openSettings"],
-    ["ShortcutMenuBar.toggleWordWrap", "editor.action.toggleWordWrap"],
-    [
-      "ShortcutMenuBar.changeEncoding",
-      "workbench.action.editor.changeEncoding",
-    ],
-    ["ShortcutMenuBar.powershellRestartSession", "PowerShell.RestartSession"],
-  ];
 
   let disposableCommandsArray: Disposable[] = [];
   // The command has been defined in the package.json file
   // Now provide the implementation of the command with  registerCommand
   // The commandId parameter must match the command field in package.json
 
-  commandArray.forEach((command) => {
-    disposableCommandsArray.push(
-      commands.registerCommand(command[0], () => {
-        commands.executeCommand(command[1]).then(function () {});
-      })
-    );
-  });
-
-  // Step: else add complex command separately
-
-  let disposableBeautify = commands.registerCommand(
-    "ShortcutMenuBar.beautify",
+  let disposableVNC = commands.registerCommand(
+    "GitpodVNC.openVNC",
     () => {
-      let editor = window.activeTextEditor;
-      if (!editor) {
-        return; // No open text editor
-      }
+      const config = workspace.getConfiguration("GitpodVNC");
+      const port = config.get<Number>("vncPort");
+      const newWindow = config.get<Boolean>("newWindow");
 
-      if (window.state.focused === true && !editor.selection.isEmpty) {
-        commands
-          .executeCommand("editor.action.formatSelection")
-          .then(function () {});
+      if(port === null || port === undefined){
+        window.showErrorMessage("The port configured in VS Code is invalid.");
       } else {
-        commands
-          .executeCommand("editor.action.formatDocument")
-          .then(function () {});
+        if(newWindow === true){
+          exec(`open-vnc ${port} 1`, (error, stdout, stderr) => {
+            if (error) {
+                window.showErrorMessage(`${error.message}`);
+                return;
+            }
+            if (stderr) {
+                window.showErrorMessage(`${stderr}`);
+                return;
+            }
+            if (stdout === null || stdout === null || stdout.trimEnd() === ""){
+              window.showInformationMessage(`Opening noVNC on port ${port}`);
+            } else {
+              window.showErrorMessage(`${stdout}`);
+            }
+        });
+        } else {
+          exec(`open-vnc ${port} 0`, (error, stdout, stderr) => {
+            if (error) {
+                window.showErrorMessage(`${error.message}`);
+                return;
+            }
+            if (stderr) {
+                window.showErrorMessage(`${stderr}`);
+                return;
+            }
+            if (stdout === null || stdout === null || stdout.trimEnd() === ""){
+              window.showInformationMessage(`Opening noVNC on port ${port}`);
+            } else {
+              window.showErrorMessage(`${stdout}`);
+            }
+        });
+        }
       }
     }
   );
 
-  let disposableFormatWith = commands.registerCommand(
-    "ShortcutMenuBar.formatWith",
+  let disposableStartVNC = commands.registerCommand(
+    "GitpodVNC.startVNC",
     () => {
-      let editor = window.activeTextEditor;
-      if (!editor) {
-        return; // No open text editor
-      }
-
-      if (window.state.focused === true && !editor.selection.isEmpty) {
-        commands
-          .executeCommand("editor.action.formatSelection.multiple")
-          .then(function () {});
-      } else {
-        commands
-          .executeCommand("editor.action.formatDocument.multiple")
-          .then(function () {});
-      }
+      window.withProgress({
+        location: ProgressLocation.Notification,
+        cancellable: false,
+        title: 'Initializing Desktop'
+    }, async (progress) => {
+        
+        progress.report({  message: `Starting session and VNC server` });
+    
+        await exec("gp-vncsession");
+        await Promise.resolve();
+    
+        progress.report({ increment: 100 });
+        window.showInformationMessage("Started Desktop Environment.");
+    });
     }
   );
 
-  // see opened files list
-  let disposableFileList = commands.registerCommand(
-    "ShortcutMenuBar.openFilesList",
+  let disposableStopVNC = commands.registerCommand(
+    "GitpodVNC.stopVNC",
     () => {
-      let editor = window.activeTextEditor;
-      if (!editor || !editor.viewColumn) {
-        return; // No open text editor
-      }
-      commands
-        .executeCommand("workbench.action.showAllEditorsByMostRecentlyUsed")
-        .then(function () {});
-    }
-  );
-
-  let disposableSwitch = commands.registerCommand(
-    "ShortcutMenuBar.switchHeaderSource",
-    () => {
-      if (hasCpp) {
-        commands
-          .executeCommand("C_Cpp.SwitchHeaderSource")
-          .then(function () {});
-      } else {
-        window.showErrorMessage(
-          "C/C++ extension (ms-vscode.cpptools) is not installed!"
-        );
-      }
+      window.withProgress({
+        location: ProgressLocation.Notification,
+        cancellable: false,
+        title: 'Stopping Desktop'
+    }, async (progress) => {
+        
+        progress.report({  message: `Stopping session and VNC server` });
+    
+        await exec("vncserver -kill");
+        await exec("ps -A -o pid,cmd | grep \"novnc_proxy\" | grep -v grep | head -n 1 | awk '{print $1}' | xargs kill");
+        await Promise.resolve();
+    
+        progress.report({ increment: 100 });
+        window.showInformationMessage("Stopped Desktop Environment.");
+    });
     }
   );
 
@@ -197,196 +157,50 @@ export function activate(context: ExtensionContext) {
     context.subscriptions.push(i);
   });
 
+  checkVnc();
+
   // Adding 2) to a list of disposables which are disposed when this extension is deactivated
 
-  context.subscriptions.push(disposableFileList);
-  context.subscriptions.push(disposableBeautify);
-  context.subscriptions.push(disposableFormatWith);
-  context.subscriptions.push(disposableSwitch);
-
-  // Adding 3 // user defined userButtons
-  for (let index = 1; index <= 10; index++) {
-    const printIndex = index !== 10 ? "0" + index : "" + index;
-    let action = "userButton" + printIndex;
-    let actionName = "ShortcutMenuBar." + action;
-    let disposableUserButtonCommand = commands.registerCommand(
-      actionName,
-      () => {
-        const config = workspace.getConfiguration("ShortcutMenuBar");
-        let configName = action + "Command";
-        const command = config.get<String>(configName);
-
-        // skip userButtons not set
-        if (
-          command === null ||
-          command === undefined ||
-          command.trimEnd() === ""
-        ) {
-          return;
-        }
-
-        const palettes = command.split(",");
-        executeNext(action, palettes, 0);
-      }
-    );
-    context.subscriptions.push(disposableUserButtonCommand);
-  }
+  context.subscriptions.push(disposableVNC);
+  context.subscriptions.push(disposableStartVNC);
+  context.subscriptions.push(disposableStopVNC);
 
   //also update userButton in package.json.. see "Adding new userButtons" in help.md file
 }
 
+async function recursevnc() {
+  await sleep('2000');
+  checkVnc();
+}
+
+async function checkVnc() {
+  const config = workspace.getConfiguration("GitpodVNC");
+  const port = config.get<Number>("vncPort");
+  const workspacedir = String(workspace.getWorkspaceFolder);
+  await exec(`gp ports list | grep ${port} | cut -d "|" -f 3 | grep "open" -c > ${homedir}/.config/gitpod-vnc/.port`);
+  await exec(`cat $GITPOD_REPO_ROOT/.gitpod.Dockerfile | grep "gitpod/workspace-full-vnc" -c > ${homedir}/.config/gitpod-vnc/.docker`);
+  await exec(`cat $GITPOD_REPO_ROOT/.gitpod.yml | grep ".gitpod.Dockerfile" -c > ${homedir}/.config/gitpod-vnc/.gitpodyml`);
+  var isdocker = Number(readFileSync(`${homedir}/.config/gitpod-vnc/.docker`, 'utf-8'));
+  var isgitpodtsk = Number(readFileSync(`${homedir}/.config/gitpod-vnc/.gitpodyml`, 'utf-8'));
+  var isport = Number(readFileSync(`${homedir}/.config/gitpod-vnc/.port`, 'utf-8'));
+
+  if(isdocker === 1 && isgitpodtsk === 1){
+    if(isport === 0){
+      config.update("openVNC", false);
+      config.update("startVNC", true);
+      config.update("stopVNC", false);
+    } else {
+      config.update("openVNC", true);
+      config.update("startVNC", false);
+      config.update("stopVNC", true);
+    }
+  } else {
+    config.update("openVNC", false);
+    config.update("startVNC", false);
+    config.update("stopVNC", false);
+  }
+  recursevnc();
+} 
+
 // this method is called when your extension is deactivated
 export function deactivate() {}
-
-// local functions for user-defined button execution follow, based on
-// https://github.com/ppatotski/vscode-commandbar/ Copyright 2018 Petr Patotski
-
-function executeNext(action: String, palettes: String[], index: number) {
-  try {
-    let [cmd, ...args] = palettes[index].split("|");
-    if (args) {
-      args = args.map((arg) => resolveVariables(arg));
-    }
-    cmd = cmd.trim();
-    commands.executeCommand(cmd, ...args).then(
-      () => {
-        index++;
-        if (index < palettes.length) {
-          executeNext(action, palettes, index);
-        }
-      },
-      (err: any) => {
-        window.showErrorMessage(
-          `Execution of '${action}' command has failed: ${err.message}`
-        );
-      }
-    );
-  } catch (err: any) {
-    window.showErrorMessage(
-      `Execution of '${action}' command has failed: ${err.message}`
-    );
-    console.error(err);
-  }
-}
-
-const resolveVariablesFunctions = {
-  env: (name) => process.env[name.toUpperCase()],
-  cwd: () => process.cwd(),
-  workspaceRoot: () => getWorkspaceFolder(),
-  workspaceFolder: () => getWorkspaceFolder(),
-  workspaceRootFolderName: () => basename(getWorkspaceFolder()),
-  workspaceFolderBasename: () => basename(getWorkspaceFolder()),
-  lineNumber: () => window.activeTextEditor?.selection.active.line,
-  selectedText: () =>
-    window.activeTextEditor?.document.getText(
-      window.activeTextEditor.selection
-    ),
-  file: () => getActiveEditorName(),
-  fileDirname: () => dirname(getActiveEditorName()),
-  fileExtname: () => extname(getActiveEditorName()),
-  fileBasename: () => basename(getActiveEditorName()),
-  fileBasenameNoExtension: () => {
-    const edtBasename = basename(getActiveEditorName());
-    return edtBasename.slice(
-      0,
-      edtBasename.length - extname(edtBasename).length
-    );
-  },
-  execPath: () => process.execPath,
-};
-
-const variableRegEx = /\$\{(.*?)\}/g;
-function resolveVariables(commandLine: String) {
-  return commandLine
-    .trim()
-    .replace(variableRegEx, function replaceVariable(match, variableValue) {
-      const [variable, argument] = variableValue.split(":");
-      const resolver = resolveVariablesFunctions[variable];
-      if (!resolver) {
-        throw new Error(`Variable ${variable} not found!`);
-      }
-
-      return resolver(argument);
-    });
-}
-
-function getActiveEditorName() {
-  if (window.activeTextEditor) {
-    return window.activeTextEditor.document.fileName;
-  }
-  return "";
-}
-
-function getWorkspaceFolder(activeTextEditor = window.activeTextEditor) {
-  let folder;
-  if (workspace?.workspaceFolders) {
-    if (workspace.workspaceFolders.length === 1) {
-      folder = workspace.workspaceFolders[0].uri.fsPath;
-    } else if (activeTextEditor) {
-      const folderObject = workspace.getWorkspaceFolder(
-        activeTextEditor.document.uri
-      );
-      if (folderObject) {
-        folder = folderObject.uri.fsPath;
-      } else {
-        folder = "";
-      }
-    } else if (workspace.workspaceFolders.length > 0) {
-      folder = workspace.workspaceFolders[0].uri.fsPath;
-    }
-  }
-  return folder;
-}
-
-// https://stackoverflow.com/a/66303259/3073272
-function isMajorUpdate(previousVersion: string, currentVersion: string) {
-  // rain-check for malformed string
-  if (previousVersion.indexOf(".") === -1) {
-    return true;
-  }
-  //returns int array [1,1,1] i.e. [major,minor,patch]
-  var previousVerArr = previousVersion.split(".").map(Number);
-  var currentVerArr = currentVersion.split(".").map(Number);
-
-  if (currentVerArr[0] > previousVerArr[0]) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-async function showWhatsNew(context: ExtensionContext) {
-  try {
-    const previousVersion = context.globalState.get<string>(extensionId);
-    const currentVersion =
-      extensions.getExtension(extensionId)!.packageJSON.version;
-
-    // store latest version
-    context.globalState.update(extensionId, currentVersion);
-
-    if (
-      previousVersion === undefined ||
-      isMajorUpdate(previousVersion, currentVersion)
-    ) {
-      // show whats new notificatin:
-      const actions = [{ title: "See how" }];
-
-      const result = await window.showInformationMessage(
-        `Shortcut Menubar v${currentVersion} — Add your own buttons!`,
-        ...actions
-      );
-
-      if (result !== null) {
-        if (result === actions[0]) {
-          await env.openExternal(
-            Uri.parse(
-              "https://github.com/GorvGoyl/Shortcut-Menu-Bar-VSCode-Extension#create-buttons-with-custom-commands"
-            )
-          );
-        }
-      }
-    }
-  } catch (e) {
-    console.log("Error", e);
-  }
-}

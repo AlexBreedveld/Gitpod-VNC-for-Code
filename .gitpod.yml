@@ -1,0 +1,10 @@
+.gitpod.Dockerfile
+
+tasks:
+  - init: npm install && npm run compile
+    command: npm run watch
+
+vscode:
+  extensions:
+    - dbaeumer.vscode-eslint
+    - christian-kohler.npm-intellisense
