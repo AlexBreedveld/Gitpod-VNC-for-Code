@@ -1,0 +1,50 @@
+image: node:latest
+
+stages:
+  - build
+  - publish
+
+build:
+  stage: build
+  image: node:latest
+  tags:
+    - docker
+  before_script:
+    - echo "Setting up packages for Build"
+    - sudo apt-get update && sudo apt-get install jq rsync -y
+  script:
+    - npm i
+    - npm run package
+    - export VERSIONVNC=$(jq -r '.version' ./package.json)
+    - mv ./gitpod-vnc-$VERSIONVNC.vsix ./gitpod-vnc.vsix
+  after_script:
+    - export VERSIONVNC=$(jq -r '.version' ./package.json)
+    - echo "VERSIONVNC=$VERSIONVNC" >> job.env
+  artifacts:
+     paths:
+       - ./gitpod-vnc.vsix
+     expire_in: never
+     reports:
+       dotenv: job.env
+
+create:release:
+  stage: publish
+  tags:
+    - docker
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: build
+      artifacts: true
+  variables:
+    TAG: '$VERSIONVNC'
+  script:
+    - echo "Create Release $TAG"
+  release:
+    name: 'Gitpod VNC for Code Release $TAG'
+    tag_name: '$TAG'
+    ref: '$TAG'
+    description: 'Release $TAG'
+    assets:
+      links:
+        - name: "Gitpod VNC for Code"
+          url: "https://git.al3xdev.com/al3xdev/gitpod-vnc-shortcut/-/jobs/$JOB_ID/artifacts/download"
